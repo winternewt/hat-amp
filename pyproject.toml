@@ -1,0 +1,49 @@
+[project]
+name = "hat-amp"
+version = "0.1.0"
+description = "Aperiodic hat monotile tiling and percolation library"
+authors = [
+    {name = "Newton Winter", email = "isoutthere@gmail.com"},
+]
+maintainers = [
+    {name = "Newton Winter", email = "isoutthere@gmail.com"},
+]
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "numpy>=2.0",
+    "pydantic>=2.13.3",
+]
+
+[project.optional-dependencies]
+graph = [
+    "scipy>=1.17.1",
+    "tqdm>=4.67.3",
+]
+viz = [
+    "cairosvg>=2.9.0",
+]
+
+[build-system]
+requires = ["uv-build"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "cairosvg>=2.9.0",
+    "httpx>=0.28.1",
+    "pytest>=9.0.2",
+    "ruff>=0.9.0",
+    "scipy>=1.17.1",
+    "tqdm>=4.67.3",
+]
+
+[tool.pytest.ini_options]
+markers = [
+    "reference: tests that compare against downloaded third-party reference scripts",
+]
+
+[tool.ruff]
+exclude = [
+    "Aperiodic-Monotile-Percolation",
+]

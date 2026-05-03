@@ -1,6 +1,6 @@
 [project]
 name = "hat-amp"
-version = "0.1.0"
+version = "0.1.1"
 description = "Aperiodic hat monotile tiling and percolation library"
 authors = [
     {name = "Newton Winter", email = "isoutthere@gmail.com"},
@@ -9,7 +9,7 @@ maintainers = [
     {name = "Newton Winter", email = "isoutthere@gmail.com"},
 ]
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.11"
 dependencies = [
     "numpy>=2.0",
     "pydantic>=2.13.3",

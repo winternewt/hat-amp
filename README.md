@@ -1,5 +1,7 @@
 # hat-amp
 
+[![Tests](https://github.com/winternewt/hat-amp/actions/workflows/tests.yml/badge.svg)](https://github.com/winternewt/hat-amp/actions/workflows/tests.yml)
+
 Python tools for aperiodic tilings and percolation experiments.
 
 `hat-amp` generates exact hat monotile coordinates from Craig Kaplan's

@@ -9,9 +9,14 @@ from xml.sax.saxutils import escape
 import numpy as np
 
 from hat_amp.penrose import generate_penrose_tiling
+from hat_amp.spectre import generate_spectre_tiling_labeled
 from hat_amp.tiling import HAT_OUTLINE, generate_patch_tiling, generate_tiling
 
-TileSource = Literal["hat", "hat-patch", "penrose"]
+TileSource = Literal["hat", "hat-patch", "penrose", "spectre"]
+
+# SVG fill colours for Spectre tile types.
+_SPECTRE_FILL_S = "#c8dff0"   # standalone Spectre — light blue
+_SPECTRE_FILL_M = "#f0c8c8"   # Mystic component — light red
 
 
 def _normalize_polygons(polygons: list[np.ndarray]) -> list[np.ndarray]:
@@ -98,6 +103,39 @@ def render_single_tile_svg(
     )
 
 
+def render_spectre_svg(
+    level: int,
+    *,
+    stroke: str = "#222222",
+    stroke_width: float = 0.05,
+    fill_s: str = _SPECTRE_FILL_S,
+    fill_m: str = _SPECTRE_FILL_M,
+    width: int = 800,
+    height: int = 800,
+) -> str:
+    """Render a Spectre tiling patch with distinct colours for S and M tiles."""
+    polygons, labels = generate_spectre_tiling_labeled(level)
+    normalized = _normalize_polygons(polygons)
+    vb = _bounds(normalized, padding=1.0)
+
+    elements: list[str] = []
+    for polygon, label in zip(normalized, labels):
+        colour = fill_m if label == "M" else fill_s
+        point_text = _svg_points(polygon, vb)
+        elements.append(
+            f'<polygon points="{point_text}" fill="{escape(colour)}" '
+            f'stroke="{escape(stroke)}" stroke-width="{stroke_width:.12g}" />'
+        )
+
+    return (
+        '<svg xmlns="http://www.w3.org/2000/svg" '
+        f'width="{width}" height="{height}" '
+        f'viewBox="0 0 {vb[2]:.12g} {vb[3]:.12g}">\n'
+        + "\n".join(elements)
+        + "\n</svg>\n"
+    )
+
+
 def render_patch_svg(
     level: int,
     *,
@@ -107,13 +145,15 @@ def render_patch_svg(
     width: int = 800,
     height: int = 800,
 ) -> str:
-    """Render a hat, hat-patch, or Penrose patch at the requested level."""
+    """Render a hat, hat-patch, Penrose, or Spectre patch at the requested level."""
     if source == "hat":
         polygons = generate_tiling(level)
     elif source == "hat-patch":
         polygons = generate_patch_tiling(level)
     elif source == "penrose":
         polygons = generate_penrose_tiling(divisions=level).polygons()
+    elif source == "spectre":
+        return render_spectre_svg(level, stroke=stroke, width=width, height=height)
     else:
         msg = f"Unsupported tile source: {source}"
         raise ValueError(msg)

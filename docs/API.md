@@ -1,15 +1,18 @@
 # hat-amp API
 
-`hat-amp` provides NumPy-based geometry tools for hat monotile and Penrose
-tilings, graph construction, square-window cropping, percolation experiments,
-result persistence, and SVG/PNG rendering.
+`hat-amp` provides NumPy-based geometry tools for aperiodic monotile tilings
+(Hat and Spectre families) and Penrose tilings, graph construction,
+square-window cropping, percolation experiments, result persistence, and
+SVG/PNG rendering.
 
 The package name is `hat-amp`; Python imports use `hat_amp`.
 
 ```python
 from hat_amp.tiling import generate_tiling
+from hat_amp.spectre import generate_spectre_tiling
 
 hats = generate_tiling(level=3)
+spectres = generate_spectre_tiling(level=3)
 ```
 
 ## Installation Extras
@@ -132,6 +135,140 @@ hex coordinates and converted by:
 
 ```python
 hex_pt(x, y) = (x + 0.5 * y, (sqrt(3) / 2) * y)
+```
+
+## Spectre
+
+Import from `hat_amp.spectre`:
+
+```python
+from hat_amp.spectre import (
+    GOLD_VERTEX_IDX,
+    SPECTRE_KEYS,
+    SPECTRE_OUTLINE,
+    SpectreTile,
+    SpectreNode,
+    add_gold_vertex,
+    expand_spectres,
+    generate_spectre_tiling,
+    generate_spectre_tiling_labeled,
+    strip_gold_vertex,
+)
+```
+
+### `generate_spectre_tiling(level) -> list[np.ndarray]`
+
+Returns all Spectre polygons from `level` inflation steps of the 9-type
+substitution system, seeded from the `Delta` supertile. Each polygon is a
+`(14, 2)` `float64` array. Vertex index 10 is the Singh–Flicker gold vertex
+(see below).
+
+| Level | Polygons |
+| ---: | ---: |
+| 0 | 1 |
+| 1 | 9 |
+| 2 | 71 |
+| 3 | 559 |
+
+Counts follow the recursion: `S_{n+1} = 7·S_n + M_n`, `M_{n+1} = 6·S_n + M_n`
+with `S_0 = 1`, `M_0 = 2` (initial polygon counts for a bare Spectre vs. a Mystic).
+
+### `generate_spectre_tiling_labeled(level) -> tuple[list[np.ndarray], list[str]]`
+
+Same as above, plus a per-polygon label list:
+
+- `'S'` — standalone Spectre tile
+- `'M'` — one component of a Mystic compound (two labeled `'M'` tiles share a fused edge)
+
+```python
+from hat_amp.spectre import generate_spectre_tiling_labeled
+
+polygons, labels = generate_spectre_tiling_labeled(level=2)
+s_polys = [p for p, l in zip(polygons, labels) if l == "S"]
+m_polys = [p for p, l in zip(polygons, labels) if l == "M"]
+```
+
+### Gold vertex helpers
+
+Vertex 10 of each 14-vertex Spectre polygon is the *gold vertex*: edges
+`V9→V10` and `V10→V11` are both parallel (leftward), so the vertex is
+collinear and does not contribute topologically. Its inclusion makes the vertex
+graph bipartite, enabling exact dimer and zero-mode analysis per Singh &
+Flicker (PRB 109 L220303).
+
+#### `strip_gold_vertex(polygons) -> list[np.ndarray]`
+
+Removes vertex 10 from each 14-vertex polygon, returning `(13, 2)` arrays
+suitable for standard (non-bipartite) vertex-graph analysis.
+
+```python
+from hat_amp.spectre import generate_spectre_tiling, strip_gold_vertex
+
+polygons = generate_spectre_tiling(level=3)
+polys_13v = strip_gold_vertex(polygons)
+```
+
+#### `add_gold_vertex(polygons) -> list[np.ndarray]`
+
+Inserts the gold vertex back into 13-vertex polygons (midpoint of V9–V11),
+restoring the 14-vertex bipartite form.
+
+### Constants
+
+- `SPECTRE_OUTLINE: list[np.ndarray]` — 14 Cartesian vertices of the
+  unit-edge Spectre at the canonical position.
+- `SPECTRE_KEYS: list[np.ndarray]` — the four *quad* key-points
+  (`SPECTRE_OUTLINE[3, 5, 7, 11]`) used for supertile edge-matching.
+- `GOLD_VERTEX_IDX: int` — equals `10`.
+
+### Data model
+
+`SpectreTile` is a leaf node:
+
+- `label: str` — tile type name (`"Delta"`, `"Gamma1"`, `"Gamma2"`, …)
+- `shape: list[np.ndarray]` — vertex list (copy of `SPECTRE_OUTLINE`)
+- `quad: list[np.ndarray]` — copy of `SPECTRE_KEYS`
+
+`SpectreNode` is an internal node (supertile or Mystic compound):
+
+- `children: list[tuple[np.ndarray, SpectreTile | SpectreNode]]` — `(transform, child)` pairs
+- `quad: list[np.ndarray]` — key-points at this level
+- `add_child(T, geom) -> None`
+
+### `expand_spectres(geom, transform=None) -> tuple[list[np.ndarray], list[str]]`
+
+Walk a substitution tree rooted at `geom` and collect all leaf Spectre
+polygons with their labels. Useful for custom starting configurations.
+
+```python
+from hat_amp.spectre import _build_spectre_base, expand_spectres
+
+sys_ = _build_spectre_base()
+polygons, labels = expand_spectres(sys_["Delta"])   # level-0 Delta leaf
+```
+
+### Spectre percolation workflow
+
+```python
+from hat_amp.spectre import generate_spectre_tiling, strip_gold_vertex
+from hat_amp.graph import build_vertex_graph, crop_square
+from hat_amp.percolation import BoundarySets, Criterion, run_site_trials
+
+polygons = generate_spectre_tiling(level=3)
+# polygons = strip_gold_vertex(polygons)  # uncomment for non-bipartite graph
+
+graph = build_vertex_graph(polygons)
+cropped = crop_square(graph, L=60.0)
+boundaries = BoundarySets.from_cropped_graph(cropped)
+
+thresholds = run_site_trials(
+    cropped,
+    boundaries,
+    trials=200,
+    seed=42,
+    criterion=Criterion.INTERSECTION,
+)
+print(thresholds.mean())
 ```
 
 ## Penrose
@@ -453,9 +590,17 @@ Convenience renderer for generated patches.
 
 Supported sources:
 
-- `"hat"`: `generate_tiling(level)`
-- `"hat-patch"`: `generate_patch_tiling(level)`
-- `"penrose"`: `generate_penrose_tiling(divisions=level).polygons()`
+- `"hat"`: `generate_tiling(level)` — uniform fill
+- `"hat-patch"`: `generate_patch_tiling(level)` — uniform fill
+- `"penrose"`: `generate_penrose_tiling(divisions=level).polygons()` — uniform fill
+- `"spectre"`: `generate_spectre_tiling_labeled(level)` — `'S'` tiles blue, `'M'` tiles red
+
+```python
+from hat_amp.viz import render_patch_svg, save_svg
+
+svg = render_patch_svg(2, source="spectre")
+save_svg(svg, "spectre_level_2.svg")
+```
 
 ### `save_png(svg_or_polygons, path, dpi=96) -> Path`
 
@@ -504,6 +649,11 @@ The test suite checks:
 - vertex and dual graph counts against upstream graph builders
 - WLS percolation extrapolation against the upstream implementation
 - SVG well-formedness and PNG creation
+- Spectre tile geometry: all 14 edges unit length, gold vertex collinear
+- Spectre tile counts at levels 0–3 against the `S_{n+1} = 7S_n + M_n` recursion
+- Spectre label set contains only `'S'` and `'M'`
+- `strip_gold_vertex` / `add_gold_vertex` round-trip fidelity
+- Bipartite (14-vertex) vertex graph has more nodes than stripped (13-vertex) graph
 
 Reference tests download source files from:
 

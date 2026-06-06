@@ -1,6 +1,6 @@
 [project]
 name = "hat-amp"
-version = "0.1.1"
+version = "0.2.0"
 description = "Aperiodic hat monotile tiling and percolation library"
 authors = [
     {name = "Newton Winter", email = "isoutthere@gmail.com"},
